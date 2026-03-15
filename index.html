@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Daily Purpose Habit Coach</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/canvas-confetti@1.9.3/dist/confetti.browser.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        primary: '#2D6A4F',
+        'primary-light': '#52B788',
+        'primary-dark': '#1B4332',
+        accent: '#D4A373',
+        'accent-light': '#FAEDCD',
+        warm: '#FEFAE0',
+        'warm-dark': '#606C38',
+        danger: '#BC4749',
+        sky: '#E9F5DB',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+      }
+    }
+  }
+}
+</script>
+<style>
+* { -webkit-tap-highlight-color: transparent; }
+body { font-family: 'Inter', system-ui, sans-serif; background: #FEFAE0; }
+.tab-active { color: #2D6A4F; border-bottom: 3px solid #2D6A4F; }
+.tab-inactive { color: #9CA3AF; }
+.fade-in { animation: fadeIn 0.3s ease-in-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse-gentle { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
+.pulse-gentle { animation: pulse-gentle 2s infinite; }
+.habit-card { transition: all 0.2s ease; }
+.habit-card:active { transform: scale(0.97); }
+.progress-ring { transition: stroke-dashoffset 0.5s ease; }
+input, textarea, select { font-size: 16px !important; }
+.modal-overlay { backdrop-filter: blur(4px); }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: #52B788; border-radius: 4px; }
+.chat-bubble { max-width: 85%; }
+</style>
+</head>
+<body class="bg-warm min-h-screen">
+
+<div id="app" class="max-w-lg mx-auto min-h-screen flex flex-col">
+  <!-- Header -->
+  <header class="bg-primary text-white px-4 py-4 rounded-b-2xl shadow-lg sticky top-0 z-40">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold flex items-center gap-2">🌿 Daily Purpose</h1>
+        <p class="text-primary-light text-xs mt-0.5" id="greeting-text">Your habit coach</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="showPage('insights')" class="bg-primary-light/20 p-2 rounded-full" title="Insights">
+          <span class="text-lg">📊</span>
+        </button>
+        <button onclick="showSettings()" class="bg-primary-light/20 p-2 rounded-full" title="Settings">
+          <span class="text-lg">⚙️</span>
+        </button>
+      </div>
+    </div>
+    <!-- Daily Progress -->
+    <div class="mt-3 bg-primary-dark/30 rounded-xl p-3 flex items-center gap-3">
+      <svg width="52" height="52" viewBox="0 0 52 52" class="flex-shrink-0">
+        <circle cx="26" cy="26" r="22" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="4"/>
+        <circle id="progress-ring" cx="26" cy="26" r="22" fill="none" stroke="#52B788" stroke-width="4" 
+          stroke-dasharray="138.23" stroke-dashoffset="138.23" stroke-linecap="round" 
+          transform="rotate(-90 26 26)" class="progress-ring"/>
+        <text x="26" y="30" text-anchor="middle" fill="white" font-size="13" font-weight="600" id="progress-pct">0%</text>
+      </svg>
+      <div class="flex-1">
+        <p class="text-sm font-medium">Today's Progress</p>
+        <p class="text-xs text-primary-light" id="progress-detail">Start your first habit!</p>
+      </div>
+      <div class="text-center">
+        <p class="text-2xl font-bold" id="streak-count">0</p>
+        <p class="text-xs text-primary-light">🔥 Streak</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 overflow-y-auto pb-24" id="main-content">
+    <!-- Onboarding -->
+    <div id="page-onboarding" class="hidden p-4 fade-in">
+      <div class="bg-white rounded-2xl shadow-md p-6 text-center">
+        <p class="text-5xl mb-4">🌱</p>
+        <h2 class="text-2xl font-bold text-primary-dark mb-2">Welcome!</h2>
+        <p class="text-gray-600 mb-6 text-lg leading-relaxed">Let's build meaningful daily habits that bring <strong>purpose</strong> and <strong>joy</strong> to your routine.</p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-left text-sm font-medium text-gray-700 mb-1">What's your name? 😊</label>
+            <input id="onboard-name" type="text" placeholder="e.g., Margaret" 
+              class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-lg focus:border-primary focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-left text-sm font-medium text-gray-700 mb-1">What gives you purpose? 💡</label>
+            <textarea id="onboard-purpose" rows="3" placeholder="e.g., Staying healthy, connecting with family, learning new things, volunteering..."
+              class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-lg focus:border-primary focus:outline-none resize-none"></textarea>
+          </div>
+          <div>
+            <label class="block text-left text-sm font-medium text-gray-700 mb-1">Any health considerations? 🏥</label>
+            <input id="onboard-health" type="text" placeholder="e.g., Arthritis, morning appointments..." 
+              class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-lg focus:border-primary focus:outline-none">
+          </div>
+          <button onclick="completeOnboarding()" 
+            class="w-full bg-primary text-white text-lg font-semibold py-4 rounded-xl shadow-lg hover:bg-primary-dark transition pulse-gentle mt-2">
+            🚀 Get My Personalized Habits
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Home / Habits -->
+    <div id="page-home" class="hidden p-4 fade-in">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-lg font-semibold text-primary-dark">Today's Habits</h2>
+        <span class="text-sm text-gray-500" id="today-date"></span>
+      </div>
+      <div id="habits-list" class="space-y-3"></div>
+      <button onclick="showAddHabit()" 
+        class="w-full mt-4 border-2 border-dashed border-primary-light rounded-xl py-4 text-primary font-medium text-lg flex items-center justify-center gap-2 hover:bg-sky transition">
+        ➕ Add New Habit
+      </button>
+      
+      <!-- Upcoming Schedule -->
+      <div class="mt-6">
+        <h3 class="text-lg font-semibold text-primary-dark mb-3">📅 Today's Schedule</h3>
+        <div id="schedule-list" class="space-y-2"></div>
+      </div>
+
+      <!-- Community Section -->
+      <div class="mt-6">
+        <h3 class="text-lg font-semibold text-primary-dark mb-3">🤝 Community Opportunities</h3>
+        <div id="community-list" class="space-y-2">
+          <p class="text-gray-400 text-center py-4">Chat with your coach to discover local groups!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Coach Chat -->
+    <div id="page-coach" class="hidden flex flex-col fade-in" style="height: calc(100vh - 220px);">
+      <div class="px-4 pt-3 pb-2">
+        <h2 class="text-lg font-semibold text-primary-dark flex items-center gap-2">🧑‍⚕️ Your Purpose Coach</h2>
+        <p class="text-xs text-gray-500">Ask about habits, schedule, local activities, or wellbeing tips</p>
+      </div>
+      <div id="chat-messages" class="flex-1 overflow-y-auto px-4 space-y-3 pb-3">
+        <div class="chat-bubble bg-primary-light/20 text-primary-dark rounded-2xl rounded-tl-md p-3 text-sm">
+          <p>Hello! 👋 I'm your Purpose Coach. I can help you:</p>
+          <ul class="mt-2 space-y-1 ml-2">
+            <li>🌱 Create new purposeful habits</li>
+            <li>📋 Optimize your daily schedule</li>
+            <li>🤝 Find local volunteer & social groups</li>
+            <li>💪 Suggest gentle exercises</li>
+            <li>🧠 Share wellbeing tips</li>
+          </ul>
+          <p class="mt-2">What would you like to work on today?</p>
+        </div>
+      </div>
+      <div class="px-4 pb-3 pt-2 bg-warm border-t border-gray-200">
+        <div class="flex gap-2">
+          <input id="chat-input" type="text" placeholder="Ask your coach anything..." 
+            class="flex-1 border-2 border-gray-200 rounded-xl px-4 py-3 focus:border-primary focus:outline-none"
+            onkeypress="if(event.key==='Enter')sendChat()">
+          <button onclick="sendChat()" class="bg-primary text-white px-5 py-3 rounded-xl font-medium text-lg min-w-[56px]">
+            📤
+          </button>
+        </div>
+        <div class="flex gap-2 mt-2 overflow-x-auto pb-1">
+          <button onclick="quickChat('Suggest a morning routine')" class="flex-shrink-0 bg-white border border-primary-light rounded-full px-3 py-1.5 text-xs text-primary">☀️ Morning routine</button>
+          <button onclick="quickChat('Find volunteer opportunities near me')" class="flex-shrink-0 bg-white border border-primary-light rounded-full px-3 py-1.5 text-xs text-primary">🤝 Volunteer</button>
+          <button onclick="quickChat('Gentle exercises for today')" class="flex-shrink-0 bg-white border border-primary-light rounded-full px-3 py-1.5 text-xs text-primary">💪 Exercises</button>
+          <button onclick="quickChat('How am I doing this week?')" class="flex-shrink-0 bg-white border border-primary-light rounded-full px-3 py-1.5 text-xs text-primary">📊 My progress</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Insights -->
+    <div id="page-insights" class="hidden p-4 fade-in">
+      <h2 class="text-lg font-semibold text-primary-dark mb-4">📊 Weekly Insights</h2>
+      
+      <div class="bg-white rounded-2xl shadow-md p-4 mb-4">
+        <h3 class="font-semibold text-primary-dark mb-3">This Week's Habit Completion</h3>
+        <div id="weekly-chart" class="flex items-end justify-between gap-1 h-32"></div>
+        <div class="flex justify-between text-xs text-gray-400 mt-1">
+          <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-md p-4 mb-4">
+        <h3 class="font-semibold text-primary-dark mb-2">🏆 Achievements</h3>
+        <div id="achievements-list" class="space-y-2"></div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-md p-4 mb-4">
+        <h3 class="font-semibold text-primary-dark mb-2">🌡️ Wellbeing Score</h3>
+        <div class="flex items-center gap-4">
+          <div class="text-4xl font-bold text-primary" id="wellbeing-score">--</div>
+          <div class="flex-1">
+            <div class="bg-gray-200 rounded-full h-3">
+              <div id="wellbeing-bar" class="bg-primary-light rounded-full h-3 transition-all" style="width: 0%"></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-1" id="wellbeing-tip">Complete habits to see your score!</p>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="generateWeeklyReport()" 
+        class="w-full bg-primary text-white font-semibold py-4 rounded-xl shadow-lg">
+        📝 Generate AI Weekly Report
+      </button>
+      <div id="weekly-report" class="mt-4 hidden bg-white rounded-2xl shadow-md p-4">
+        <div id="weekly-report-content"></div>
+      </div>
+    </div>
+
+    <!-- Gait & Wellbeing Monitor -->
+    <div id="page-monitor" class="hidden p-4 fade-in">
+      <h2 class="text-lg font-semibold text-primary-dark mb-4">🏃 Movement & Wellbeing Monitor</h2>
+      
+      <div class="bg-white rounded-2xl shadow-md p-4 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-semibold text-primary-dark">Daily Movement Check-In</h3>
+          <span class="text-2xl">🚶</span>
+        </div>
+        <p class="text-sm text-gray-600 mb-4">Log how you're feeling about your mobility today to track trends over time.</p>
+        <div class="space-y-3">
+          <div>
+            <label class="text-sm font-medium text-gray-700">How steady do you feel today? (1-10)</label>
+            <input id="stability-input" type="range" min="1" max="10" value="7" class="w-full mt-1 accent-primary">
+            <div class="flex justify-between text-xs text-gray-400"><span>Unsteady</span><span>Very stable</span></div>
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-700">Energy level (1-10)</label>
+            <input id="energy-input" type="range" min="1" max="10" value="6" class="w-full mt-1 accent-primary">
+            <div class="flex justify-between text-xs text-gray-400"><span>Low</span><span>High</span></div>
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-700">Any pain or discomfort?</label>
+            <select id="pain-input" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none">
+              <option value="none">None</option>
+              <option value="mild">Mild</option>
+              <option value="moderate">Moderate</option>
+              <option value="severe">Severe</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-sm font-medium text-gray-700">Steps estimate today</label>
+            <input id="steps-input" type="number" placeholder="e.g., 3000" 
+              class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none">
+          </div>
+          <button onclick="logMovement()" class="w-full bg-primary text-white font-semibold py-3 rounded-xl">
+            ✅ Log Today's Check-In
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-md p-4 mb-4">
+        <h3 class="font-semibold text-primary-dark mb-3">📈 Mobility Trend (Last 7 Days)</h3>
+        <div id="mobility-chart" class="flex items-end justify-between gap-1 h-24"></div>
+        <div class="flex justify-between text-xs text-gray-400 mt-1" id="mobility-dates"></div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-md p-4 mb-4">
+        <h3 class="font-semibold text-primary-dark mb-2">🎯 Fall Risk Assessment</h3>
+        <div class="flex items-center gap-4">
+          <div class="text-3xl font-bold" id="risk-score-display">--</div>
+          <div class="flex-1">
+            <p class="text-sm text-gray-600" id="risk-message">Complete daily check-ins for your personalized assessment</p>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="getExerciseRecommendation()" 
+        class="w-full bg-accent text-white font-semibold py-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+        🧘 Get Personalized Exercises
+      </button>
+      <div id="exercise-rec" class="mt-4 hidden bg-white rounded-2xl shadow-md p-4">
+        <div id="exercise-content"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Nav -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+    <div class="max-w-lg mx-auto flex">
+      <button onclick="showPage('home')" class="flex-1 py-3 flex flex-col items-center gap-0.5 tab-btn" data-tab="home">
+        <span class="text-xl">🏠</span>
+        <span class="text-xs font-medium">Home</span>
+      </button>
+      <button onclick="showPage('coach')" class="flex-1 py-3 flex flex-col items-center gap-0.5 tab-btn" data-tab="coach">
+        <span class="text-xl">💬</span>
+        <span class="text-xs font-medium">Coach</span>
+      </button>
+      <button onclick="showPage('monitor')" class="flex-1 py-3 flex flex-col items-center gap-0.5 tab-btn" data-tab="monitor">
+        <span class="text-xl">🏃</span>
+        <span class="text-xs font-medium">Monitor</span>
+      </button>
+      <button onclick="showPage('insights')" class="flex-1 py-3 flex flex-col items-center gap-0.5 tab-btn" data-tab="insights">
+        <span class="text-xl">📊</span>
+        <span class="text-xs font-medium">Insights</span>
+      </button>
+    </div>
+  </nav>
+</div>
+
+<!-- Add Habit Modal -->
+<div id="add-habit-modal" class="hidden fixed inset-0 z-50 flex items-end justify-center modal-overlay bg-black/30">
+  <div class="bg-white w-full max-w-lg rounded-t-3xl p-6 fade-in max-h-[80vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-primary-dark">Add New Habit</h3>
+      <button onclick="closeModal('add-habit-modal')" class="text-gray-400 text-2xl">&times;</button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="text-sm font-medium text-gray-700">Habit Name</label>
+        <input id="new-habit-name" type="text" placeholder="e.g., Morning walk" 
+          class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none">
+      </div>
+      <div>
+        <label class="text-sm font-medium text-gray-700">Category</label>
+        <select id="new-habit-category" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none">
+          <option value="health">💪 Health & Exercise</option>
+          <option value="social">🤝 Social & Community</option>
+          <option value="learning">📚 Learning & Growth</option>
+          <option value="mindfulness">🧘 Mindfulness</option>
+          <option value="creative">🎨 Creative</option>
+          <option value="volunteer">❤️ Volunteering</option>
+        </select>
+      </div>
+      <div>
+        <label class="text-sm font-medium text-gray-700">Best Time</label>
+        <input id="new-habit-time" type="time" value="09:00" 
+          class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none">
+      </div>
+      <div>
+        <label class="text-sm font-medium text-gray-700">Duration (minutes)</label>
+        <input id="new-habit-duration" type="number" value="15" min="5" max="120" 
+          class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none">
+      </div>
+      <div>
+        <label class="text-sm font-medium text-gray-700">Connected Purpose</label>
+        <input id="new-habit-purpose" type="text" placeholder="Why this matters to you..." 
+          class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none">
+      </div>
+      <button onclick="addHabit()" class="w-full bg-primary text-white font-semibold py-4 rounded-xl">
+        ✅ Add Habit
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-end justify-center modal-overlay bg-black/30">
+  <div class="bg-white w-full max-w-lg rounded-t-3xl p-6 fade-in max-h-[80vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-bold text-primary-dark">⚙️ Settings</h3>
+      <button onclick="closeModal('settings-modal')" class="text-gray-400 text-2xl">&times;</button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="text-sm font-medium text-gray-700">Your Name</label>
+        <input id="settings-name" type="text" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none">
+      </div>
+      <div>
+        <label class="text-sm font-medium text-gray-700">Your Purpose Goals</label>
+        <textarea id="settings-purpose" rows="3" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none resize-none"></textarea>
+      </div>
+      <div>
+        <label class="text-sm font-medium text-gray-700">Health Considerations</label>
+        <input id="settings-health" type="text" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 mt-1 focus:border-primary focus:outline-none">
+      </div>
+      <button onclick="saveSettings()" class="w-full bg-primary text-white font-semibold py-3 rounded-xl">💾 Save Settings</button>
+      <button onclick="resetApp()" class="w-full bg-danger/10 text-danger font-semibold py-3 rounded-xl">🗑️ Reset All Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="hidden fixed inset-0 z-[60] bg-black/40 flex items-center justify-center modal-overlay">
+  <div class="bg-white rounded-2xl p-6 text-center shadow-xl max-w-xs">
+    <div class="text-4xl mb-3 animate-bounce">🌿</div>
+    <p class="font-semibold text-primary-dark" id="loading-text">Working on it...</p>
+    <p class="text-sm text-gray-500 mt-1">Your coach is thinking</p>
+  </div>
+</div>
+
+<script>
+// Global AI tracking variables
+let totalAIInputTokens = 0;
+let totalAIOutputTokens = 0;
+let totalAITime = 0;
+let aiTimeByAlias = {};
+
+const API_BASE = 'https://16504442930.work';
+
+// ===== AI HELPER =====
+async function callAI(alias, params, retries = 3) {
+  const start = Date.now();
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await fetch(`${API_BASE}/run_prompt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alias, params })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        if (attempt === retries - 1) {
+          const friendly = await reformatError(data, res.status);
+          throw new Error(friendly);
+        }
+        continue;
+      }
+      const elapsed = Date.now() - start;
+      totalAITime += elapsed;
+      aiTimeByAlias[alias] = (aiTimeByAlias[alias] || 0) + elapsed;
+      if (data.input_tokens) totalAIInputTokens += data.input_tokens;
+      if (data.output_tokens) totalAIOutputTokens += data.output_tokens;
+      return data;
+    } catch (e) {
+      if (attempt === retries - 1) throw e;
+    }
+  }
+}
+
+async function reformatError(apiResponse, statusCode) {
+  try {
+    const res = await callAI('genericAI', {
+      prompt: `You are a friendly assistant helping a retiree use a habit coaching app. An API error occurred with status ${statusCode}. The raw response was: ${JSON.stringify(apiResponse)}. Please rewrite this error into a warm, friendly message that: 1) Explains what went wrong in simple terms, 2) Suggests what the user can do to fix it, 3) Is encouraging. Return a JSON object with exactly one key "message" of type string.`
+    }, 1);
+    return res.message || 'Something went wrong. Please try again in a moment! 🌿';
+  } catch {
+    return `Oops! Something didn't work quite right. Please try again in a moment. (Details: ${JSON.stringify(apiResponse)})`;
+  }
+}
+
+// ===== DATA LAYER =====
+function getData() {
+  const d = localStorage.getItem('purposeCoach');
+  return d ? JSON.parse(d) : null;
+}
+function saveData(data) {
+  localStorage.setItem('purposeCoach', JSON.stringify(data));
+}
+function getDefaultData() {
+  return {
+    user: { name: '', purpose: '', health: '', onboarded: false },
+    habits: [],
+    completions: {},
+    streak: 0,
+    lastCompletionDate: null,
+    movementLogs: [],
+    chatHistory: [],
+    weeklyData: {}
+  };
+}
+function todayKey() { return new Date().toISOString().split('T')[0]; }
+
+// ===== INIT =====
+function init() {
+  let data = getData();
+  if (!data) {
+    data = getDefaultData();
+    saveData(data);
+  }
+  updateGreeting(data);
+  if (!data.user.onboarded) {
+    showPage('onboarding');
+  } else {
+    showPage('home');
+  }
+}
+
+function updateGreeting(data) {
+  const hour = new Date().getHours();
+  let greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const name = data.user.name || 'friend';
+  document.getElementById('greeting-text').textContent = `${greet}, ${name}! ✨`;
+}
+
+// ===== NAVIGATION =====
+function showPage(page) {
+  const pages = ['onboarding', 'home', 'coach', 'monitor', 'insights'];
+  pages.forEach(p => {
+    document.getElementById(`page-${p}`).classList.add('hidden');
+  });
+  document.getElementById(`page-${page}`).classList.remove('hidden');
+  
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const t = btn.dataset.tab;
+    if (t === page) {
+      btn.classList.add('tab-active');
+      btn.classList.remove('tab-inactive');
+    } else {
+      btn.classList.remove('tab-active');
+      btn.classList.add('tab-inactive');
+    }
+  });
+
+  if (page === 'home') renderHome();
+  if (page === 'insights') renderInsights();
+  if (page === 'monitor') renderMonitor();
+}
+
+function showLoading(text = 'Working on it...') {
+  document.getElementById('loading-text').textContent = text;
+  document.getElementById('loading-overlay').classList.remove('hidden');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.add('hidden');
+}
+function showAddHabit() { document.getElementById('add-habit-modal').classList.remove('hidden'); }
+function showSettings() {
+  const data = getData();
+  document.getElementById('settings-name').value = data.user.name;
+  document.getElementById('settings-purpose').value = data.user.purpose;
+  document.getElementById('settings-health').value = data.user.health;
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+// ===== ONBOARDING =====
+async function completeOnboarding() {
+  const name = document.getElementById('onboard-name').value.trim();
+  const purpose = document.getElementById('onboard-purpose').value.trim();
+  const health = document.getElementById('onboard-health').value.trim();
+  
+  if (!name) { alert('Please enter your name 😊'); return; }
+  if (!purpose) { alert('Please share what gives you purpose 💡'); return; }
+  
+  showLoading('Creating your personalized habit plan...');
+  
+  try {
+    const result = await callAI('genericAI', {
+      prompt: `You are a habit coach for retirees. Create a personalized daily habit plan for a retiree named "${name}" whose purpose goals are: "${purpose}". Health considerations: "${health || 'none specified'}".
+
+Create 5-7 daily micro-habits that:
+1. Connect directly to their stated purpose
+2. Are gentle and achievable for a retiree
+3. Cover different categories (health, social, learning, mindfulness, creative, volunteer)
+4. Are scheduled at optimal times throughout the day
+5. Each take 5-30 minutes
+
+Return a JSON object with exactly this structure:
+{
+  "habits": [
+    {
+      "name": string (the habit name, max 40 chars),
+      "category": string (one of: "health", "social", "learning", "mindfulness", "creative", "volunteer"),
+      "time": string (24h format like "09:00"),
+      "duration": number (minutes, between 5 and 30),
+      "purpose": string (why this connects to their goals, max 60 chars),
+      "emoji": string (a single emoji for this habit)
+    }
+  ],
+  "welcomeMessage": string (a warm 2-sentence welcome message for ${name})
+}`
+    });
+    
+    const data = getData();
+    data.user = { name, purpose, health, onboarded: true };
+    data.habits = result.habits.map((h, i) => ({
+      id: Date.now() + i,
+      ...h,
+      active: true,
+      createdAt: todayKey()
+    }));
+    saveData(data);
+    
+    hideLoading();
+    updateGreeting(data);
+    showPage('home');
+    
+    // Show welcome confetti
+    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    
+  } catch (e) {
+    hideLoading();
+    alert(e.message || 'Something went wrong. Please try again!');
+  }
+}
+
+// ===== HABITS RENDERING =====
+function renderHome() {
+  const data = getData();
+  const today = todayKey();
+  const completions = data.completions[today] || [];
+  
+  // Date display
+  const opts = { weekday: 'long', month: 'long', day: 'numeric' };
+  document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', opts);
+  
+  // Sort habits by time
+  const habits = (data.habits || []).filter(h => h.active).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  
+  const list = document.getElementById('habits-list');
+  if (habits.length === 0) {
+    list.innerHTML = '<div class="text-center py-8 text-gray-400"><p class="text-4xl mb-2">🌱</p><p>No habits yet. Add your first one!</p></div>';
+  } else {
+    list.innerHTML = habits.map(h => {
+      const done = completions.includes(h.id);
+      const catEmojis = { health: '💪', social: '🤝', learning: '📚', mindfulness: '🧘', creative: '🎨', volunteer: '❤️' };
+      const emoji = h.emoji || catEmojis[h.category] || '✨';
+      return `
+        <div class="habit-card bg-white rounded-2xl shadow-sm p-4 flex items-center gap-3 ${done ? 'opacity-70' : ''}" 
+             onclick="toggleHabit(${h.id})">
+          <div class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl flex-shrink-0 ${done ? 'bg-primary-light/30' : 'bg-sky'}">
+            ${done ? '✅' : emoji}
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-primary-dark ${done ? 'line-through' : ''}">${h.name}</p>
+            <p class="text-xs text-gray-500">${h.time ? formatTime(h.time) : ''} · ${h.duration || 15}min · ${h.purpose || ''}</p>
+          </div>
+          <button onclick="event.stopPropagation(); deleteHabit(${h.id})" class="text-gray-300 hover:text-danger text-xl p-1">×</button>
+        </div>
+      `;
+    }).join('');
+  }
+  
+  // Update progress
+  const total = habits.length;
+  const completed = completions.filter(id => habits.find(h => h.id === id)).length;
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+  
+  document.getElementById('progress-pct').textContent = pct + '%';
+  const circumference = 2 * Math.PI * 22;
+  document.getElementById('progress-ring').style.strokeDashoffset = circumference - (pct / 100) * circumference;
+  document.getElementById('progress-detail').textContent = `${completed} of ${total} habits done today`;
+  
+  // Streak
+  updateStreak(data);
+  document.getElementById('streak-count').textContent = data.streak || 0;
+  
+  // Schedule
+  renderSchedule(habits, completions);
+}
+
+function formatTime(time24) {
+  const [h, m] = time24.split(':');
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const h12 = hour % 12 || 12;
+  return `${h12}:${m} ${ampm}`;
+}
+
+function renderSchedule(habits, completions) {
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  
+  const scheduled = habits.filter(h => h.time).map(h => {
+    const [hh, mm] = h.time.split(':');
+    const mins = parseInt(hh) * 60 + parseInt(mm);
+    const done = completions.includes(h.id);
+    const isPast = mins + (h.duration || 15) < currentMinutes;
+    const isCurrent = mins <= currentMinutes && mins + (h.duration || 15) >= currentMinutes;
+    return { ...h, mins, done, isPast, isCurrent };
+  }).sort((a, b) => a.mins - b.mins);
+  
+  const list = document.getElementById('schedule-list');
+  list.innerHTML = scheduled.map(s => `
+    <div class="flex items-center gap-3 ${s.done ? 'opacity-50' : ''} ${s.isCurrent ? 'bg-primary-light/10 -mx-2 px-2 py-1 rounded-lg' : ''}">
+      <div class="text-xs font-mono w-16 text-right ${s.isCurrent ? 'text-primary font-bold' : 'text-gray-400'}">${formatTime(s.time)}</div>
+      <div class="w-2 h-2 rounded-full flex-shrink-0 ${s.done ? 'bg-primary-light' : s.isCurrent ? 'bg-primary animate-pulse' : s.isPast ? 'bg-gray-300' : 'bg-accent'}"></div>
+      <div class="text-sm ${s.done ? 'line-through text-gray-400' : 'text-gray-700'}">${s.emoji || ''} ${s.name}</div>
+      ${s.isCurrent ? '<span class="text-xs bg-primary text-white px-2 py-0.5 rounded-full ml-auto">Now</span>' : ''}
+    </div>
+  `).join('');
+}
+
+function toggleHabit(id) {
+  const data = getData();
+  const today = todayKey();
+  if (!data.completions[today]) data.completions[today] = [];
+  
+  const idx = data.completions[today].indexOf(id);
+  if (idx >= 0) {
+    data.completions[today].splice(idx, 1);
+  } else {
+    data.completions[today].push(id);
+    // Mini confetti for completing
+    confetti({ particleCount: 30, spread: 50, origin: { y: 0.7 }, colors: ['#2D6A4F', '#52B788', '#D4A373'] });
+  }
+  
+  saveData(data);
+  renderHome();
+  
+  // Check if all done
+  const activeHabits = data.habits.filter(h => h.active);
+  if (data.completions[today].length === activeHabits.length && activeHabits.length > 0) {
+    confetti({ particleCount: 150, spread: 100, origin: { y: 0.5 } });
+  }
+}
+
+function deleteHabit(id) {
+  if (!confirm('Remove this habit?')) return;
+  const data = getData();
+  data.habits = data.habits.filter(h => h.id !== id);
+  saveData(data);
+  renderHome();
+}
+
+function addHabit() {
+  const name = document.getElementById('new-habit-name').value.trim();
+  if (!name) { alert('Please enter a habit name'); return; }
+  
+  const data = getData();
+  const catEmojis = { health: '💪', social: '🤝', learning: '📚', mindfulness: '🧘', creative: '🎨', volunteer: '❤️' };
+  const cat = document.getElementById('new-habit-category').value;
+  
+  data.habits.push({
+    id: Date.now(),
+    name,
+    category: cat,
+    time: document.getElementById('new-habit-time').value,
+    duration: parseInt(document.getElementById('new-habit-duration').value) || 15,
+    purpose: document.getElementById('new-habit-purpose').value.trim(),
+    emoji: catEmojis[cat] || '✨',
+    active: true,
+    createdAt: todayKey()
+  });
+  saveData(data);
+  closeModal('add-habit-modal');
+  
+  // Clear form
+  document.getElementById('new-habit-name').value = '';
+  document.getElementById('new-habit-purpose').value = '';
+  
+  renderHome();
+}
+
+function updateStreak(data) {
+  const today = todayKey();
+  const activeHabits = data.habits.filter(h => h.active);
+  if (activeHabits.length === 0) { data.streak = 0; saveData(data); return; }
+  
+  const todayCompletions = data.completions[today] || [];
+  const allDoneToday = todayCompletions.length >= activeHabits.length;
+  
+  let streak = 0;
+  let checkDate = new Date();
+  
+  if (!allDoneToday) {
+    checkDate.setDate(checkDate.getDate() - 1);
+  }
+  
+  for (let i = 0; i < 365; i++) {
+    const key = checkDate.toISOString().split('T')[0];
+    const comps = data.completions[key] || [];
+    if (comps.length >= activeHabits.length) {
+      streak++;
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  
+  if (allDoneToday) streak++;
+  
+  data.streak = streak;
+  saveData(data);
+}
+
+// ===== COACH CHAT =====
+async function sendChat(msg) {
+  const input = document.getElementById('chat-input');
+  const message = msg || input.value.trim();
+  if (!message) return;
+  
+  input.value = '';
+  
+  const data = getData();
+  const chatDiv = document.getElementById('chat-messages');
+  
+  // Add user message
+  chatDiv.innerHTML += `
+    <div class="flex justify-end">
+      <div class="chat-bubble bg-primary text-white rounded-2xl rounded-tr-md p-3 text-sm">${escapeHtml(message)}</div>
+    </div>
+  `;
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+  
+  // Loading bubble
+  chatDiv.innerHTML += `
+    <div id="typing-indicator" class="chat-bubble bg-gray-100 rounded-2xl rounded-tl-md p-3 text-sm text-gray-500">
+      <span class="animate-pulse">🌿 Thinking...</span>
+    </div>
+  `;
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+  
+  try {
+    const today = todayKey();
+    const completions = data.completions[today] || [];
+    const activeHabits = data.habits.filter(h => h.active);
+    const pct = activeHabits.length > 0 ? Math.round((completions.length / activeHabits.length) * 100) : 0;
+    
+    const context = `User profile: Name="${data.user.name}", Purpose="${data.user.purpose}", Health="${data.user.health}".
+Current habits: ${activeHabits.map(h => `${h.name} (${h.category}, ${h.time})`).join(', ')}.
+Today's progress: ${pct}% (${completions.length}/${activeHabits.length} habits done).
+Streak: ${data.streak} days.
+Recent movement logs: ${JSON.stringify((data.movementLogs || []).slice(-3))}`;
+    
+    const result = await callAI('genericAI', {
+      prompt: `You are a warm, encouraging habit coach for a retiree. You speak simply and kindly, like a supportive friend.
+
+Context about the user:
+${context}
+
+The user says: "${message}"
+
+Respond helpfully. If they ask about habits, schedule, exercises, community, or wellbeing, give specific and actionable advice. If they ask about local groups or volunteer opportunities, suggest realistic types of activities (book clubs, walking groups, library volunteering, meal delivery, gardening clubs, etc.) that match their interests.
+
+Keep your response concise (under 150 words) and encouraging with a couple of emojis.
+
+If the response includes a suggestion for a new habit, include it.
+
+Return a JSON object with exactly this structure:
+{
+  "reply": string (your conversational response),
+  "suggestedHabit": null | { "name": string, "category": string (one of: health, social, learning, mindfulness, creative, volunteer), "time": string (24h format), "duration": number, "purpose": string, "emoji": string }
+}`
+    });
+    
+    // Remove typing indicator
+    const typing = document.getElementById('typing-indicator');
+    if (typing) typing.remove();
+    
+    // Add coach reply
+    let replyHtml = `<p>${escapeHtml(result.reply)}</p>`;
+    if (result.suggestedHabit) {
+      replyHtml += `
+        <div class="mt-2 p-2 bg-white rounded-lg border border-primary-light">
+          <p class="text-xs font-semibold">💡 Suggested Habit:</p>
+          <p class="text-sm font-medium">${result.suggestedHabit.emoji || '✨'} ${result.suggestedHabit.name}</p>
+          <button onclick='addSuggestedHabit(${JSON.stringify(result.suggestedHabit).replace(/'/g, "&#39;")})' 
+            class="mt-1 bg-primary text-white text-xs px-3 py-1.5 rounded-lg">➕ Add This Habit</button>
+        </div>
+      `;
+    }
+    
+    chatDiv.innerHTML += `
+      <div class="chat-bubble bg-primary-light/20 text-primary-dark rounded-2xl rounded-tl-md p-3 text-sm">
+        ${replyHtml}
+      </div>
+    `;
+    
+    // Save chat history
+    data.chatHistory.push({ role: 'user', msg: message, ts: Date.now() });
+    data.chatHistory.push({ role: 'coach', msg: result.reply, ts: Date.now() });
+    if (data.chatHistory.length > 50) data.chatHistory = data.chatHistory.slice(-50);
+    saveData(data);
+    
+  } catch (e) {
+    const typing = document.getElementById('typing-indicator');
+    if (typing) typing.remove();
+    chatDiv.innerHTML += `
+      <div class="chat-bubble bg-red-50 text-red-700 rounded-2xl rounded-tl-md p-3 text-sm">
+        Oops! I had trouble responding. Please try again. 🌿
+      </div>
+    `;
+  }
+  
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+}
+
+function quickChat(msg) {
+  document.getElementById('chat-input').value = msg;
+  sendChat(msg);
+}
+
+function addSuggestedHabit(habit) {
+  const data = getData();
+  data.habits.push({
+    id: Date.now(),
+    ...habit,
+    active: true,
+    createdAt: todayKey()
+  });
+  saveData(data);
+  confetti({ particleCount: 40, spread: 50, origin: { y: 0.6 } });
+  
+  const chatDiv = document.getElementById('chat-messages');
+  chatDiv.innerHTML += `
+    <div class="chat-bubble bg-sky text-primary-dark rounded-2xl p-3 text-sm text-center">
+      ✅ "${habit.name}" added to your habits!
+    </div>
+  `;
+  chatDiv.scrollTop = chatDiv.scrollHeight;
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ===== MOVEMENT MONITOR =====
+function logMovement() {
+  const data = getData();
+  const log = {
+    date: todayKey(),
+    stability: parseInt(document.getElementById('stability-input').value),
+    energy: parseInt(document.getElementById('energy-input').value),
+    pain: document.getElementById('pain-input').value,
+    steps: parseInt(document.getElementById('steps-input').value) || 0,
+    timestamp: Date.now()
+  };
+  
+  // Replace if already logged today
+  const existingIdx = (data.movementLogs || []).findIndex(l => l.date === todayKey());
+  if (existingIdx >= 0) {
+    data.movementLogs[existingIdx] = log;
+  } else {
+    if (!data.movementLogs) data.movementLogs = [];
+    data.movementLogs.push(log);
+  }
+  
+  // Keep last 90 days
+  if (data.movementLogs.length > 90) data.movementLogs = data.movementLogs.slice(-90);
+  
+  saveData(data);
+  confetti({ particleCount: 20, spread: 40, origin: { y: 0.7 }, colors: ['#52B788'] });
+  renderMonitor();
+  alert('✅ Check-in logged! Great job staying aware of your wellbeing.');
+}
+
+function renderMonitor() {
+  const data = getData();
+  const logs = (data.movementLogs || []).slice(-7);
+  
+  const chart = document.getElementById('mobility-chart');
+  const dates = document.getElementById('mobility-dates');
+  
+  if (logs.length === 0) {
+    chart.innerHTML = '<p class="text-gray-400 text-center w-full text-sm py-8">No data yet. Complete your first check-in!</p>';
+    dates.innerHTML = '';
+  } else {
+    chart.innerHTML = logs.map(l => {
+      const height = ((l.stability || 5) / 10) * 100;
+      const color = l.stability >= 7 ? '#52B788' : l.stability >= 4 ? '#D4A373' : '#BC4749';
+      return `<div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-full rounded-t-md" style="height:${height}%; background:${color}; min-height:4px;"></div>
+        <span class="text-[10px] text-gray-500">${l.stability}</span>
+      </div>`;
+    }).join('');
+    
+    dates.innerHTML = logs.map(l => {
+      const d = new Date(l.date);
+      return `<span>${d.toLocaleDateString('en', { weekday: 'short' }).charAt(0)}</span>`;
+    }).join('');
+  }
+  
+  // Risk assessment
+  if (logs.length >= 3) {
+    const recent = logs.slice(-3);
+    const avgStability = recent.reduce((s, l) => s + (l.stability || 5), 0) / recent.length;
+    const hasPain = recent.some(l => l.pain === 'moderate' || l.pain === 'severe');
+    const lowEnergy = recent.filter(l => (l.energy || 5) < 4).length >= 2;
+    
+    let riskLevel, riskColor, riskMsg;
+    if (avgStability >= 7 && !hasPain && !lowEnergy) {
+      riskLevel = 'Low';
+      riskColor = 'text-primary-light';
+      riskMsg = 'Great stability! Keep up your daily movement habits. 🌟';
+    } else if (avgStability >= 5 && !hasPain) {
+      riskLevel = 'Moderate';
+      riskColor = 'text-accent';
+      riskMsg = 'Some variability detected. Consider the exercise recommendations below. 💪';
+    } else {
+      riskLevel = 'Elevated';
+      riskColor = 'text-danger';
+      riskMsg = 'Your recent readings suggest increased care is needed. Consider speaking with your doctor. 🏥';
+    }
+    
+    document.getElementById('risk-score-display').textContent = riskLevel;
+    document.getElementById('risk-score-display').className = `text-3xl font-bold ${riskColor}`;
+    document.getElementById('risk-message').textContent = riskMsg;
+  }
+}
+
+async function getExerciseRecommendation() {
+  const data = getData();
+  showLoading('Creating your exercise plan...');
+  
+  try {
+    const recentLogs = (data.movementLogs || []).slice(-7);
+    const result = await callAI('genericAI', {
+      prompt: `You are a gentle physiotherapy advisor for retirees. Based on this user's profile and recent movement data, suggest personalized exercises.
+
+User: Name="${data.user.name}", Health="${data.user.health || 'none specified'}"
+Recent movement logs (last 7 days): ${JSON.stringify(recentLogs)}
+
+Create 4-5 gentle, safe exercises appropriate for a retiree. Focus on balance, flexibility, and strength. If they have pain or low stability readings, adapt accordingly.
+
+Return a JSON object with exactly this structure:
+{
+  "exercises": [
+    {
+      "name": string (exercise name),
+      "emoji": string (single emoji),
+      "duration": string (e.g., "30 seconds each side"),
+      "instructions": string (clear step-by-step in 2-3 sentences),
+      "benefit": string (why this helps, max 30 chars)
+    }
+  ],
+  "safetyNote": string (a brief safety reminder, max 80 chars)
+}`
+    });
+    
+    hideLoading();
+    const div = document.getElementById('exercise-rec');
+    div.classList.remove('hidden');
+    div.querySelector('#exercise-content').innerHTML = `
+      <div class="space-y-3">
+        ${result.exercises.map(ex => `
+          <div class="border border-primary-light/30 rounded-xl p-3">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xl">${ex.emoji}</span>
+              <span class="font-semibold text-primary-dark">${ex.name}</span>
+              <span class="text-xs bg-sky text-primary px-2 py-0.5 rounded-full ml-auto">${ex.duration}</span>
+            </div>
+            <p class="text-sm text-gray-600">${ex.instructions}</p>
+            <p class="text-xs text-accent mt-1">✨ ${ex.benefit}</p>
+          </div>
+        `).join('')}
+        <p class="text-xs text-gray-500 text-center mt-2">⚠️ ${result.safetyNote}</p>
+      </div>
+    `;
+    
+  } catch (e) {
+    hideLoading();
+    alert(e.message || 'Could not generate exercises. Please try again!');
+  }
+}
+
+// ===== INSIGHTS =====
+function renderInsights() {
+  const data = getData();
+  const activeHabits = data.habits.filter(h => h.active);
+  
+  // Weekly chart
+  const chart = document.getElementById('weekly-chart');
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    const comps = (data.completions[key] || []).length;
+    const total = activeHabits.length || 1;
+    const pct = Math.min(Math.round((comps / total) * 100), 100);
+    days.push(pct);
+  }
+  
+  chart.innerHTML = days.map(pct => {
+    const height = Math.max(pct, 5);
+    const color = pct >= 80 ? '#52B788' : pct >= 50 ? '#D4A373' : '#E5E7EB';
+    return `<div class="flex-1 flex flex-col items-center">
+      <div class="w-full rounded-t-md transition-all" style="height:${height}%; background:${color}; min-height:4px;"></div>
+      <span class="text-[10px] text-gray-500 mt-1">${pct}%</span>
+    </div>`;
+  }).join('');
+  
+  // Wellbeing score
+  const totalDaysLogged = Object.keys(data.completions).length;
+  const recentLogs = (data.movementLogs || []).slice(-7);
+  const avgStability = recentLogs.length > 0 ? recentLogs.reduce((s, l) => s + (l.stability || 5), 0) / recentLogs.length : 0;
+  const avgCompletion = days.reduce((s, d) => s + d, 0) / 7;
+  const score = recentLogs.length > 0 ? Math.round((avgStability * 5 + avgCompletion * 0.5) / 1) : 0;
+  
+  document.getElementById('wellbeing-score').textContent = score > 0 ? score : '--';
+  document.getElementById('wellbeing-bar').style.width = `${Math.min(score, 100)}%`;
+  document.getElementById('wellbeing-tip').textContent = score > 70 ? 'Excellent! You\'re thriving! 🌟' : score > 40 ? 'Good progress! Keep building momentum 💪' : score > 0 ? 'Every small step counts! 🌱' : 'Complete habits and check-ins to see your score!';
+  
+  // Achievements
+  const achievements = [];
+  if (data.streak >= 1) achievements.push({ emoji: '🔥', text: `${data.streak}-day streak!` });
+  if (data.streak >= 7) achievements.push({ emoji: '🏆', text: 'Week warrior!' });
+  if (data.streak >= 30) achievements.push({ emoji: '👑', text: 'Monthly champion!' });
+  if (totalDaysLogged >= 1) achievements.push({ emoji: '🌱', text: 'First day completed!' });
+  if (totalDaysLogged >= 7) achievements.push({ emoji: '🌿', text: 'One week of growth!' });
+  if (activeHabits.length >= 5) achievements.push({ emoji: '⭐', text: '5+ habits building!' });
+  if ((data.movementLogs || []).length >= 3) achievements.push({ emoji: '🏃', text: 'Movement tracker active!' });
+  
+  const achList = document.getElementById('achievements-list');
+  achList.innerHTML = achievements.length > 0 ? achievements.map(a => `
+    <div class="flex items-center gap-3 py-2">
+      <span class="text-2xl">${a.emoji}</span>
+      <span class="text-sm font-medium text-gray-700">${a.text}</span>
+    </div>
+  `).join('') : '<p class="text-gray-400 text-center py-3">Complete habits to earn achievements! 🌟</p>';
+}
+
+async function generateWeeklyReport() {
+  const data = getData();
+  showLoading('Generating your weekly report...');
+  
+  try {
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      const comps = (data.completions[key] || []).length;
+      days.push({ date: key, completed: comps, total: data.habits.filter(h => h.active).length });
+    }
+    
+    const result = await callAI('genericAI', {
+      prompt: `You are a warm, encouraging habit coach. Write a personalized weekly report for a retiree.
+
+User: "${data.user.name}", Purpose: "${data.user.purpose}"
+Current streak: ${data.streak} days
+Habits: ${data.habits.filter(h => h.active).map(h => h.name).join(', ')}
+This week's daily completion: ${JSON.stringify(days)}
+Movement logs: ${JSON.stringify((data.movementLogs || []).slice(-7))}
+
+Write a warm, motivating weekly summary (150-200 words) that:
+1. Celebrates what they did well
+2. Notes patterns or trends
+3. Gives 2-3 specific suggestions for next week
+4. Connects their progress to their stated purpose
+5. Uses warm language and a few emojis
+
+Return a JSON object with exactly: { "report": string (the full report in HTML using p, strong, ul, li tags for formatting), "overallGrade": string (one of: "A+", "A", "B+", "B", "C+", "C") }`
+    });
+    
+    hideLoading();
+    const div = document.getElementById('weekly-report');
+    div.classList.remove('hidden');
+    div.querySelector('#weekly-report-content').innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="font-bold text-primary-dark">📝 Your Weekly Report</h4>
+        <span class="text-2xl font-bold text-primary">${result.overallGrade}</span>
+      </div>
+      <div class="text-sm text-gray-700 leading-relaxed">${result.report}</div>
+    `;
+    
+  } catch (e) {
+    hideLoading();
+    alert(e.message || 'Could not generate report. Please try again!');
+  }
+}
+
+// ===== SETTINGS =====
+function saveSettings() {
+  const data = getData();
+  data.user.name = document.getElementById('settings-name').value.trim();
+  data.user.purpose = document.getElementById('settings-purpose').value.trim();
+  data.user.health = document.getElementById('settings-health').value.trim();
+  saveData(data);
+  updateGreeting(data);
+  closeModal('settings-modal');
+}
+
+function resetApp() {
+  if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
+    localStorage.removeItem('purposeCoach');
+    location.reload();
+  }
+}
+
+// ===== INIT =====
+init();
+</script>
+</body>
+</html>
